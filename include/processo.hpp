@@ -29,6 +29,20 @@ namespace pseudo_so {
         int remaining_ms = 0;
         int wait_ms = 0;
 
+        // construtor padrao
+        Process() = default;
+
+        // construtor com parametro
+        Process(int pid, int ar, int prio, int cpu, int fr, ResourceRequest res = {})
+                : pid(pid), 
+                  arrival_ms(ar), 
+                  priority(prio), 
+                  base_priority(prio), 
+                  cpu_ms(cpu), 
+                  frames(fr), 
+                  resources(res), 
+                  remaining_ms(cpu) {}  
+
         bool is_realtime() const {return base_priority == RT_PRIORITY;}
     };
 
