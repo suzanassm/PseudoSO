@@ -27,8 +27,6 @@ public:
     // executa 1 ms de pid, retorna true se ele terminou
     bool tick();
 
-    // aging: quem espera demais sobe uma fila
-
     // ainda tem processo na fila global, nas filas de prontos ou rodando?
     bool has_work() const;
     
