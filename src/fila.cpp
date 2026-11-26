@@ -10,9 +10,24 @@ std::deque<int>& Scheduler::user_queue(int priority){
 }
 
 bool Scheduler::enqueue_global(int pid){
-    if(global_queue.size() >= MAX_PROCESS) return false;
+    // verifica se o PID existe na tabela de processos
+    if(pid < 0 || (std::size_t)pid >= table.size()) return false;
 
-    table[pid].state = State::WAITING;
+    Process& p = table[pid];
+    // somente processos novos podem entrar na fila global
+    if(p.state != State::NEW) return false;
+    // valida a prioridade e o tempo restante de CPU
+    if(p.priority < RT_PRIORITY || p.priority > LOW_USER_PRIORITY) return false;
+    if(p.base_priority != p.priority || p.remaining_ms <= 0) return false;
+
+    // conta os processos ativos em todas as filas e na CPU
+    std::size_t total = global_queue.size() + rt_queue.size();
+    for(const std::deque<int>& queue: user_queues) total += queue.size();
+    if(running != NO_PID) total++;
+    if(total >= MAX_PROCESS) return false;
+
+    // insere o processo na fila global
+    p.state = State::WAITING;
     global_queue.push_back(pid);
     return true;
 }
@@ -34,6 +49,8 @@ void Scheduler::push_ready(int pid){
 void Scheduler::admit(int pid){
     auto it = std::find(global_queue.begin(), global_queue.end(), pid);
     if(it == global_queue.end()) return;
+    // somente processos aguardando admissao podem ser admitidos
+    if(table[pid].state != State::WAITING) return;
 
     global_queue.erase(it);
     push_ready(pid);
@@ -66,7 +83,7 @@ int Scheduler::pick_next(){
     return pid;
 }
 
-// supoe remainig_ms > 0 (quem le o arquivo rejeita cpu_ms <= 0)
+// executa 1 ms de CPU do processo em execucao, retorna true quando o processo termina
 bool Scheduler::tick(){
     if(running == NO_PID) return false;
 
@@ -110,7 +127,7 @@ void Scheduler::age_ready(){
             }
             else staying.push_back(pid);
         }
-        queue = staying;
+        queue.swap(staying);
     }
 }
 
