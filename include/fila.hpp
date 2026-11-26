@@ -24,7 +24,7 @@ public:
     // escolhe quem usa a CPU (state = RUNNING). NO_PID se nao ha ninguem
     int pick_next();
 
-    // executa 1 ms de pid, retorna true se ele terminou
+    // executa 1 ms do processo que esta rodando, retorna true se ele terminou
     bool tick();
 
     // ainda tem processo na fila global, nas filas de prontos ou rodando?
@@ -32,10 +32,11 @@ public:
     
 private:
     void push_ready(int pid);
+    // aging: quem espera demais sobe uma fila (chamado dentro de tick)
     void age_ready();
     std::deque<int>& user_queue(int priority);
 
-    std::vector<Process>& table_;
+    std::vector<Process>& table;
     int aging_ms;
     int running = NO_PID;
 

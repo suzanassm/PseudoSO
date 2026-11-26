@@ -37,15 +37,15 @@ struct Process{
     Process() = default;
 
     // construtor com parametro
-    Process(int pid, int ar, int prio, int cpu, int fr, ResourceRequest res = {})
+    Process(int pid, int arrival_ms, int priority, int cpu_ms, int frames, ResourceRequest res = {})
             : pid(pid), 
-              arrival_ms(ar), 
-              priority(prio), 
-              base_priority(prio), 
-              cpu_ms(cpu), 
-              frames(fr), 
+              arrival_ms(arrival_ms), 
+              priority(priority), 
+              base_priority(priority), 
+              cpu_ms(cpu_ms), 
+              frames(frames), 
               resources(res), 
-              remaining_ms(cpu) {}  
+              remaining_ms(cpu_ms) {}  
 
         
     bool is_realtime() const {
