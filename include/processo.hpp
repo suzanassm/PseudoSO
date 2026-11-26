@@ -10,9 +10,14 @@ namespace pseudo_so {
     const int HIGH_USER_PRIORITY = 1;       // filas de usuario: 1, 2 e 3
     const int LOW_USER_PRIORITY = 3;
 
-    enum class State {NEW, WAITING, READY, RUNNING, FINISHED};
+    enum class State {NEW, WAITING, READY, RUNNING, FINISHED, REJECTED};
 
-    struct ResourceRequest{};               // bool ou int?
+    struct ResourceRequest{
+        bool printer;
+        bool scanner;
+        bool modem;
+        bool sata;
+    };               
 
     struct Process{
         // lidos no .txt
