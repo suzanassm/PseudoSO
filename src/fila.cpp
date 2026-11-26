@@ -91,3 +91,34 @@ bool Scheduler::tick(){
     }
     return false;
 }
+
+void Scheduler::age_ready(){
+    if(aging_ms <= 0) return;
+    // da fila 2 pra 3; a fila 1 n envelhece (ja e a mais alta)
+    for(int prio = HIGH_USER_PRIORITY+1; prio <= LOW_USER_PRIORITY; prio++){
+        std::deque<int>& queue = user_queue(prio);
+        std::deque<int> staying;
+
+        for(int pid: queue){
+            Process& p = table[pid];
+            p.wait_ms++;
+
+            if(p.wait_ms >= aging_ms){
+                p.priority--;
+                p.wait_ms = 0;
+                user_queue(p.priority).push_back(pid);
+            }
+            else staying.push_back(pid);
+        }
+        queue = staying;
+    }
+}
+
+bool Scheduler::has_work() const{
+    if(running != NO_PID || !global_queue.empty() || !rt_queue.empty()) return true;
+
+    for(const std::deque<int>& queue: user_queues){
+        if(!queue.empty()) return true;
+    }
+    return false;
+}
