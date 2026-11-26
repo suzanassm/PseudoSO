@@ -38,3 +38,56 @@ void Scheduler::admit(int pid){
     global_queue.erase(it);
     push_ready(pid);
 }
+
+int Scheduler::pick_next(){
+    // tempo real n sofre preempcao: enquanto n terminar, continua rodando
+    if(running != NO_PID) return running;
+
+    int pid = NO_PID;
+
+    if(!rt_queue.empty()){
+        pid = rt_queue.front();
+        rt_queue.pop_front();
+    }
+    else{
+        // prioridade 1 primeiro, depois 2, depois 3
+        for(std::deque<int>& queue : user_queues){
+            if(queue.empty()) continue;
+            pid = queue.front();
+            queue.pop_front();
+            break;
+        }
+    }
+
+    if(pid != NO_PID){
+        table[pid].state = State::RUNNING;
+        running = pid;
+    }
+    return pid;
+}
+
+// supoe remainig_ms > 0 (quem le o arquivo rejeita cpu_ms <= 0)
+bool Scheduler::tick(){
+    if(running == NO_PID) return false;
+
+    int pid = running;
+    Process& p = table[pid];
+    p.remaining_ms -= 1;
+
+    // envelhece quem esperou neste 1ms (antes de devolver pid pra fila)
+    age_ready();
+
+    if(p.remaining_ms <= 0){
+        p.state = State::FINISHED;
+        running = NO_PID;
+        return true;
+    }
+
+    // processo de usuario: acabou o quantum, perde a CPU e e rebaixado
+    if(!p.is_realtime()){
+        if(p.priority < LOW_USER_PRIORITY) p.priority++;
+        running = NO_PID;
+        push_ready(pid);
+    }
+    return false;
+}
