@@ -4,23 +4,24 @@
 Scheduler::Scheduler(std::vector<Process>& table, int aging_ms)
         : table(table), aging_ms(aging_ms) {}
 
-// a fila de usuario de maior prioridade = posicao 0, a seguinte = 1 e assim por diante
+// Converte as prioridades de usuario (1 a 3) em indices do array (0 a 2)
 std::deque<int>& Scheduler::user_queue(int priority){
     return user_queues[priority - HIGH_USER_PRIORITY];
 }
 
 bool Scheduler::enqueue_global(int pid){
-    // verifica se o PID existe na tabela de processos
+    // Impede acesso fora dos limites da tabela de processos
     if(pid < 0 || (std::size_t)pid >= table.size()) return false;
 
     Process& p = table[pid];
-    // somente processos novos podem entrar na fila global
+    // Impede insercoes duplicadas e reinsercoes de processos finalizados
     if(p.state != State::NEW) return false;
-    // valida a prioridade e o tempo restante de CPU
+    // Valida os dados necessarios ao escalonamento de um processo novo
     if(p.priority < RT_PRIORITY || p.priority > LOW_USER_PRIORITY) return false;
     if(p.base_priority != p.priority || p.remaining_ms <= 0) return false;
 
-    // conta os processos ativos em todas as filas e na CPU
+    // O limite e compartilhado entre todas as filas e o processo na CPU
+    // Processos ainda nao inseridos ou ja finalizados nao ocupam vagas
     std::size_t total = global_queue.size() + rt_queue.size();
     for(const std::deque<int>& queue: user_queues) total += queue.size();
     if(running != NO_PID) total++;
@@ -36,7 +37,7 @@ const std::deque<int>& Scheduler::global() const{
     return global_queue;
 }
 
-// coloca o processo no fim da fila de prontos que corresponde a ele
+// A insercao ao final preserva a ordem FIFO dentro de cada prioridade
 void Scheduler::push_ready(int pid){
     Process& p = table[pid];
     p.state = State::READY;
@@ -47,9 +48,10 @@ void Scheduler::push_ready(int pid){
 }
 
 void Scheduler::admit(int pid){
+    // Localiza o PID na fila global, preservando a ordem dos demais
     auto it = std::find(global_queue.begin(), global_queue.end(), pid);
     if(it == global_queue.end()) return;
-    // somente processos aguardando admissao podem ser admitidos
+    // Garante que apenas processos aguardando admissao sejam transferidos
     if(table[pid].state != State::WAITING) return;
 
     global_queue.erase(it);
@@ -57,17 +59,17 @@ void Scheduler::admit(int pid){
 }
 
 int Scheduler::pick_next(){
-    // tempo real n sofre preempcao: enquanto n terminar, continua rodando
+    // Preserva a CPU ocupada; processos de tempo real nao sofrem preempcao
     if(running != NO_PID) return running;
 
     int pid = NO_PID;
-
+    // Tempo real tem precedencia sobre todas as filas de usuario
     if(!rt_queue.empty()){
         pid = rt_queue.front();
         rt_queue.pop_front();
     }
     else{
-        // prioridade 1 primeiro, depois 2, depois 3
+        // Seleciona a primeira fila de usuario nao vazia (prioridades 1 a 3)
         for(std::deque<int>& queue : user_queues){
             if(queue.empty()) continue;
             pid = queue.front();
@@ -89,9 +91,10 @@ bool Scheduler::tick(){
 
     int pid = running;
     Process& p = table[pid];
-    p.remaining_ms -= 1;
+    p.remaining_ms -= 1;            // um tick corresponde a 1 ms de CPU
 
-    // envelhece quem esperou neste 1ms (antes de devolver pid pra fila)
+    // Envelhece apenas quem esperou durante o tick, antes de reenfileirar
+    // o processo que acabou de executar
     age_ready();
 
     if(p.remaining_ms <= 0){
@@ -100,7 +103,8 @@ bool Scheduler::tick(){
         return true;
     }
 
-    // processo de usuario: acabou o quantum, perde a CPU e e rebaixado
+    // Ao consumir o quantum sem terminar, o usuario perde a CPU
+    // Rebaixa ate a prioridade 3; nesse nivel, retorna ao fim da mesma fila
     if(!p.is_realtime()){
         if(p.priority < LOW_USER_PRIORITY) p.priority++;
         running = NO_PID;
@@ -111,10 +115,12 @@ bool Scheduler::tick(){
 
 void Scheduler::age_ready(){
     if(aging_ms <= 0) return;
-    // da fila 2 pra 3; a fila 1 n envelhece (ja e a mais alta)
+    // Percorre primeiro a fila 2 e depois a 3, evitando envelhecer
+    // novamente um processo promovido no mesmo tick
+    // A fila 1 ja possui a maior prioridade entre os usuarios
     for(int prio = HIGH_USER_PRIORITY+1; prio <= LOW_USER_PRIORITY; prio++){
         std::deque<int>& queue = user_queue(prio);
-        std::deque<int> staying;
+        std::deque<int> staying;    // processos que permanecem neste nivel
 
         for(int pid: queue){
             Process& p = table[pid];
